@@ -1,1 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>霓虹星際躲避戰 | My First Game</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #0b0e14;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      touch-action: none;
+    }
+    #game-container {
+      position: relative;
+      box-shadow: 0 0 30px rgba(0, 243, 255, 0.25);
+      border: 2px solid #00f3ff;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      background: radial-gradient(circle at center, #161b29 0%, #090c10 100%);
+    }
+    #ui-layer {
+      position: absolute;
+      top: 15px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 18px;
+      font-weight: bold;
+      pointer-events: none;
+      text-shadow: 0 0 8px rgba(0, 243, 255, 0.8);
+    }
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(11, 14, 20, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 28px;
+      color: #00f3ff;
+      margin-bottom: 10px;
+      text-shadow: 0 0 15px #00f3ff;
+    }
+    p {
+      font-size: 15px;
+      color: #b0c4de;
+      margin-bottom: 25px;
+      line-height: 1.6;
+    }
+    button {
+      background: #00f3ff;
+      color: #0b0e14;
+      border: none;
+      padding: 12px 32px;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 25px;
+      cursor: pointer;
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
+      transition: transform 0.15s, background 0.15s;
+    }
+    button:hover {
+      background: #ffffff;
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
 
+  <div id="game-container">
+    <canvas id="gameCanvas" width="360" height="600"></canvas>
+    <div id="ui-layer">
+      <span>分數: <span id="score">0</span></span>
+      <span>最高: <span id="highScore">0</span></span>
+    </div>
+    <div id="overlay">
+      <h1 id="title">霓虹星際躲避戰</h1>
+      <p id="desc">左右方向鍵 (或拖曳畫面) 移動<br>躲避紅色隕石，吃掉金色能量球！</p>
+      <button id="startBtn">開始遊戲</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const highScoreEl = document.getElementById('highScore');
+    const overlay = document.getElementById('overlay');
+    const titleEl = document.getElementById('title');
+    const descEl = document.getElementById('desc');
+    const startBtn = document.getElementById('startBtn');
+
+    let isPlaying = false;
+    let score = 0;
+    let highScore = localStorage.getItem('neonDodgeHigh') || 0;
+    highScoreEl.textContent = highScore;
+
+    const player = { x: 180, y: 520, radius: 14, speed: 6 };
+    let enemies = [];
+    let coins = [];
+    let particles = [];
+    let keys = { left: false, right: false };
+
+    // 鍵盤控制
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+      if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+    });
+    window.addEventListener('keyup', e => {
+      if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+      if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+    });
+
+  
+    function movePlayerTo(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      const targetX = clientX - rect.left;
+      player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, targetX));
+    }
+    canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      if (isPlaying) movePlayerTo(e.touches[0].clientX);
+    }, { passive: false });
+    canvas.addEventListener('mousemove', e => {
+      if (isPlaying && e.buttons === 1) movePlayerTo(e.clientX);
+    });
+
+    function createParticles(x, y, color) {
+      for (let i = 0; i < 12; i++) {
+        particles.push({
+          x, y,
+          vx: (Math.random() - 0.5) * 6,
+          vy: (Math.random() - 0.5) * 6,
+          life: 1,
+          color
+        });
+      }
+    }
+
+    function resetGame() {
+      score = 0;
+      scoreEl.textContent = score;
+      player.x = canvas.width / 2;
+      enemies = [];
+      coins = [];
+      particles = [];
+      isPlaying = true;
+      overlay.style.display = 'none';
+      requestAnimationFrame(gameLoop);
+    }
+
+    function gameOver() {
+      isPlaying = false;
+      createParticles(player.x, player.y, '#00f3ff');
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('neonDodgeHigh', highScore);
+        highScoreEl.textContent = highScore;
+      }
+      titleEl.textContent = '遊戲結束！';
+      descEl.innerHTML = `本次得分：<strong>${score}</strong><br>點擊下方按鈕再次挑戰`;
+      startBtn.textContent = '再玩一次';
+      overlay.style.display = 'flex';
+    }
+
+    function gameLoop() {
+      if (!isPlaying) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    
+      if (keys.left) player.x -= player.speed;
+      if (keys.right) player.x += player.speed;
+      player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+
+ 
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#00f3ff';
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#00f3ff';
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+
+      const spawnRate = Math.min(0.08, 0.025 + score * 0.0005);
+      if (Math.random() < spawnRate) {
+        enemies.push({
+          x: Math.random() * (canvas.width - 30) + 15,
+          y: -20,
+          radius: 12 + Math.random() * 10,
+          speed: 3 + Math.random() * 2 + score * 0.03
+        });
+      }
+
+   
+      if (Math.random() < 0.02) {
+        coins.push({
+          x: Math.random() * (canvas.width - 20) + 10,
+          y: -15,
+          radius: 9,
+          speed: 3.5
+        });
+      }
+
+     
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        e.y += e.speed;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff2a5f';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ff2a5f';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        const dist = Math.hypot(player.x - e.x, player.y - e.y);
+        if (dist < player.radius + e.radius - 3) {
+          gameOver();
+          return;
+        }
+        if (e.y > canvas.height + 30) {
+          enemies.splice(i, 1);
+          score += 1;
+          scoreEl.textContent = score;
+        }
+      }
+
+     
+      for (let i = coins.length - 1; i >= 0; i--) {
+        const c = coins[i];
+        c.y += c.speed;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffd700';
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = '#ffd700';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        const dist = Math.hypot(player.x - c.x, player.y - c.y);
+        if (dist < player.radius + c.radius) {
+          createParticles(c.x, c.y, '#ffd700');
+          coins.splice(i, 1);
+          score += 10;
+          scoreEl.textContent = score;
+        } else if (c.y > canvas.height + 20) {
+          coins.splice(i, 1);
+        }
+      }
+
+     
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.04;
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        } else {
+          ctx.globalAlpha = p.life;
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x, p.y, 4, 4);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    startBtn.addEventListener('click', resetGame);
+  </script>
+</body>
+</html>
