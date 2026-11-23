@@ -128,7 +128,7 @@
       if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
     });
 
-  
+    // 觸控與滑鼠拖曳控制
     function movePlayerTo(clientX) {
       const rect = canvas.getBoundingClientRect();
       const targetX = clientX - rect.left;
@@ -184,12 +184,12 @@
       if (!isPlaying) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    
+      // 玩家移動
       if (keys.left) player.x -= player.speed;
       if (keys.right) player.x += player.speed;
       player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
 
- 
+      // 繪製玩家
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
       ctx.fillStyle = '#00f3ff';
@@ -198,28 +198,28 @@
       ctx.fill();
       ctx.shadowBlur = 0;
 
-
-      const spawnRate = Math.min(0.08, 0.025 + score * 0.0005);
+      // 生成敵人 (已調低數量與增加上限)
+      const spawnRate = Math.min(0.04, 0.012 + score * 0.0002);
       if (Math.random() < spawnRate) {
         enemies.push({
           x: Math.random() * (canvas.width - 30) + 15,
           y: -20,
           radius: 12 + Math.random() * 10,
-          speed: 3 + Math.random() * 2 + score * 0.03
+          speed: 1.8 + Math.random() * 1.2 + score * 0.015
         });
       }
 
-   
+      // 生成能量球
       if (Math.random() < 0.02) {
         coins.push({
           x: Math.random() * (canvas.width - 20) + 10,
           y: -15,
           radius: 9,
-          speed: 3.5
+          speed: 3.0
         });
       }
 
-     
+      // 更新與繪製敵人
       for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
         e.y += e.speed;
@@ -243,7 +243,7 @@
         }
       }
 
-     
+      // 更新與繪製能量球
       for (let i = coins.length - 1; i >= 0; i--) {
         const c = coins[i];
         c.y += c.speed;
@@ -266,7 +266,7 @@
         }
       }
 
-     
+      // 粒子特效
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.x += p.vx;
